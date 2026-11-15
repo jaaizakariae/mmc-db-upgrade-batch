@@ -1,0 +1,6 @@
+spring:
+  config:
+    import: 
+      - file:${app.paths.configRoot}/batch_config.yml
+      - file:${app.paths.configRoot}/datasource_config.yml
+      - file:${app.paths.configRoot}/logging_config.yml

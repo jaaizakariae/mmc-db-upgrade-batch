@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration debug="true">
+  <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+
+  <!-- Spring props -->
+  <springProperty scope="context" name="applicationName" source="spring.application.name"/>
+  <springProperty scope="context" name="env"             source="spring.profiles.active" defaultValue="local"/>
+  <springProperty scope="context" name="projectLevel"    source="logging.project.level" defaultValue="INFO"/>
+  <springProperty scope="context" name="rootLevel"       source="logging.root.level" defaultValue="INFO"/>
+  <springProperty scope="context" name="logPath"         source="logging.path" defaultValue="logs"/>
+
+  <!-- Console -->
+  <appender name="consoleOut" class="ch.qos.logback.core.ConsoleAppender">
+    <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+      <level>DEBUG</level>
+    </filter>
+    <encoder>
+      <pattern>%d{dd/MM/yyyy HH:mm:ss} [%level] [${env}] [${applicationName}] [${HOSTNAME}] [%file:%line] %msg%n</pattern>
+      <charset>utf8</charset>
+    </encoder>
+  </appender>
+
+  <!-- Rolling File -->
+  <appender name="fileOut" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${logPath}/server.log</file>
+    <encoder>
+      <pattern>%d{dd/MM/yyyy HH:mm:ss} [%level] [${env}] [${applicationName}] [${HOSTNAME}] [%file:%line] %msg%n</pattern>
+      <charset>utf8</charset>
+    </encoder>
+    <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+      <!-- daily rollover, keep 30 days -->
+      <fileNamePattern>${logPath}/archived/server.%d{yyyy-MM-dd}.log</fileNamePattern>
+      <maxHistory>30</maxHistory>
+      <!-- optional cap -->
+      <totalSizeCap>1GB</totalSizeCap>
+    </rollingPolicy>
+  </appender>
+
+  <!-- Optional: async wrappers to avoid blocking on I/O -->
+  <appender name="ASYNC_CONSOLE" class="ch.qos.logback.classic.AsyncAppender">
+    <queueSize>8192</queueSize>
+    <discardingThreshold>0</discardingThreshold>
+    <neverBlock>true</neverBlock>
+    <!-- capture caller data so %file:%line is available -->
+    <includeCallerData>true</includeCallerData>
+    <appender-ref ref="consoleOut"/>
+  </appender>
+
+  <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+    <queueSize>8192</queueSize>
+    <discardingThreshold>0</discardingThreshold>
+    <neverBlock>true</neverBlock>
+    <!-- capture caller data so %file:%line is available -->
+    <includeCallerData>true</includeCallerData>
+    <appender-ref ref="fileOut"/>
+  </appender>
+
+  <!-- LOCAL profile -->
+  <springProfile name="local">
+    <!-- Let this package log at projectLevel and send to BOTH appenders -->
+    <logger name="ma.bkam.db.upgrade" level="${projectLevel}" additivity="false">
+      <appender-ref ref="ASYNC_CONSOLE"/>
+      <appender-ref ref="ASYNC_FILE"/>
+    </logger>
+
+    <!-- Root also to BOTH -->
+    <root level="${rootLevel}">
+      <appender-ref ref="ASYNC_CONSOLE"/>
+      <appender-ref ref="ASYNC_FILE"/>
+    </root>
+  </springProfile>
+
+  <!-- DEV/INTEGRATION/PROD profiles -->
+  <springProfile name="dev,integration,prod">
+    <logger name="ma.bkam.db.upgrade" level="${projectLevel}" additivity="false">
+      <appender-ref ref="ASYNC_CONSOLE"/>
+      <appender-ref ref="ASYNC_FILE"/>
+    </logger>
+
+    <root level="${rootLevel}">
+      <appender-ref ref="ASYNC_CONSOLE"/>
+      <appender-ref ref="ASYNC_FILE"/>
+    </root>
+  </springProfile>
+</configuration>
