@@ -10,7 +10,7 @@ Batch de mise à niveau de la base de données du projet MMC (Monitoring Continu
 
 ### macOS
 
--Dapp.paths.configRoot=/Users/mac/Documents/apps/mmc/batchs/mmc-db-upgrade-batch/config -Dapp.paths.appRoot=/Users/mac/Documents/apps/mmc/batchs/mmc-db-upgrade-batch
+-Dapp.paths.configRoot=/Users/mac/Documents/apps/mmc/batchs/mmc-db-upgrade-batch/config -Dapp.paths.appRoot=/Users/mac/Documents/apps/mmc/batchs
 -Dspring.devtools.restart.enabled=false
 
 ### Windows
