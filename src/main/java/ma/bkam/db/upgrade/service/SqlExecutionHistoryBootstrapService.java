@@ -1,3 +1,4 @@
+
 package ma.bkam.db.upgrade.service;
 
 import java.sql.Connection;
@@ -5,72 +6,87 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Locale;
+import java.util.regex.Pattern;
 
 import javax.sql.DataSource;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class SqlExecutionHistoryBootstrapService {
 
-	private static final String SCHEMA_NAME = "COTMAD";
 	private static final String TABLE_NAME = "SQL_EXECUTION_HISTORY";
 	private static final String SEQUENCE_NAME = "SQL_EXECUTION_HISTORY_SEQ";
 
+	private static final String INDEX_SEQ = "IDX_SQL_HIST_SEQ";
+	private static final String INDEX_FILENAME = "IDX_SQL_HIST_FILENAME";
+	private static final String INDEX_CHECKSUM = "IDX_SQL_HIST_CHECKSUM";
+
+	private static final Pattern ORACLE_IDENTIFIER = Pattern.compile("[A-Z][A-Z0-9_$#]*");
+
 	private final DataSource dataSource;
+	private final String schemaName;
+
+	public SqlExecutionHistoryBootstrapService(DataSource dataSource,
+			@Value("${spring.jpa.properties.hibernate.default_schema}") String schemaName) {
+
+		this.dataSource = dataSource;
+		this.schemaName = validateSchemaName(schemaName);
+	}
 
 	public void initialize() {
+
 		try (Connection connection = dataSource.getConnection()) {
+
 			createSequenceIfMissing(connection);
 			createTableIfMissing(connection);
-			createIndexIfMissing(connection, "IDX_SQL_HIST_SEQ", """
-					CREATE INDEX cotmad.idx_sql_hist_seq
-					ON cotmad.sql_execution_history (sequence_number)
-					""");
-			createIndexIfMissing(connection, "IDX_SQL_HIST_FILENAME", """
-					CREATE INDEX cotmad.idx_sql_hist_filename
-					ON cotmad.sql_execution_history (filename)
-					""");
-			createIndexIfMissing(connection, "IDX_SQL_HIST_CHECKSUM", """
-					CREATE INDEX cotmad.idx_sql_hist_checksum
-					ON cotmad.sql_execution_history (checksum_sha256)
-					""");
 
-			log.info("SQL execution history technical objects are ready.");
+			createIndexIfMissing(connection, INDEX_SEQ, "sequence_number");
+
+			createIndexIfMissing(connection, INDEX_FILENAME, "filename");
+
+			createIndexIfMissing(connection, INDEX_CHECKSUM, "checksum_sha256");
+
+			log.info("SQL execution history technical objects are ready for schema {}.", schemaName);
 
 		} catch (SQLException exception) {
-			throw new IllegalStateException("Unable to initialize COTMAD.SQL_EXECUTION_HISTORY technical objects.",
+
+			throw new IllegalStateException("Unable to initialize " + qualifiedName(TABLE_NAME) + " technical objects.",
 					exception);
 		}
 	}
 
 	private void createSequenceIfMissing(Connection connection) throws SQLException {
+
 		if (sequenceExists(connection, SEQUENCE_NAME)) {
 			return;
 		}
 
-		execute(connection, """
-				CREATE SEQUENCE cotmad.sql_execution_history_seq
+		String sql = """
+				CREATE SEQUENCE %s
 				    START WITH 1
 				    INCREMENT BY 1
 				    NOCACHE
-				""");
+				""".formatted(qualifiedName(SEQUENCE_NAME));
 
-		log.info("Created sequence COTMAD.SQL_EXECUTION_HISTORY_SEQ.");
+		execute(connection, sql);
+
+		log.info("Created sequence {}.", qualifiedName(SEQUENCE_NAME));
 	}
 
 	private void createTableIfMissing(Connection connection) throws SQLException {
+
 		if (tableExists(connection, TABLE_NAME)) {
 			return;
 		}
 
-		execute(connection, """
-				CREATE TABLE cotmad.sql_execution_history (
+		String sql = """
+				CREATE TABLE %s (
 				    id                  NUMBER(19) NOT NULL,
 				    filename            VARCHAR2(512 CHAR) NOT NULL,
 				    sequence_number     NUMBER(10) NOT NULL,
@@ -84,22 +100,31 @@ public class SqlExecutionHistoryBootstrapService {
 				    CONSTRAINT pk_sql_exec_history
 				        PRIMARY KEY (id)
 				)
-				""");
+				""".formatted(qualifiedName(TABLE_NAME));
 
-		log.info("Created table COTMAD.SQL_EXECUTION_HISTORY.");
+		execute(connection, sql);
+
+		log.info("Created table {}.", qualifiedName(TABLE_NAME));
 	}
 
-	private void createIndexIfMissing(Connection connection, String indexName, String sql) throws SQLException {
+	private void createIndexIfMissing(Connection connection, String indexName, String columnName) throws SQLException {
+
 		if (indexExists(connection, indexName)) {
 			return;
 		}
 
+		String sql = """
+				CREATE INDEX %s
+				ON %s (%s)
+				""".formatted(qualifiedName(indexName), qualifiedName(TABLE_NAME), columnName);
+
 		execute(connection, sql);
 
-		log.info("Created index COTMAD.{}.", indexName);
+		log.info("Created index {}.", qualifiedName(indexName));
 	}
 
 	private boolean tableExists(Connection connection, String tableName) throws SQLException {
+
 		String sql = """
 				SELECT 1
 				FROM all_tables
@@ -108,7 +133,8 @@ public class SqlExecutionHistoryBootstrapService {
 				""";
 
 		try (PreparedStatement statement = connection.prepareStatement(sql)) {
-			statement.setString(1, SCHEMA_NAME);
+
+			statement.setString(1, schemaName);
 			statement.setString(2, tableName);
 
 			try (ResultSet resultSet = statement.executeQuery()) {
@@ -118,6 +144,7 @@ public class SqlExecutionHistoryBootstrapService {
 	}
 
 	private boolean sequenceExists(Connection connection, String sequenceName) throws SQLException {
+
 		String sql = """
 				SELECT 1
 				FROM all_sequences
@@ -126,7 +153,8 @@ public class SqlExecutionHistoryBootstrapService {
 				""";
 
 		try (PreparedStatement statement = connection.prepareStatement(sql)) {
-			statement.setString(1, SCHEMA_NAME);
+
+			statement.setString(1, schemaName);
 			statement.setString(2, sequenceName);
 
 			try (ResultSet resultSet = statement.executeQuery()) {
@@ -136,6 +164,7 @@ public class SqlExecutionHistoryBootstrapService {
 	}
 
 	private boolean indexExists(Connection connection, String indexName) throws SQLException {
+
 		String sql = """
 				SELECT 1
 				FROM all_indexes
@@ -144,7 +173,8 @@ public class SqlExecutionHistoryBootstrapService {
 				""";
 
 		try (PreparedStatement statement = connection.prepareStatement(sql)) {
-			statement.setString(1, SCHEMA_NAME);
+
+			statement.setString(1, schemaName);
 			statement.setString(2, indexName);
 
 			try (ResultSet resultSet = statement.executeQuery()) {
@@ -153,7 +183,28 @@ public class SqlExecutionHistoryBootstrapService {
 		}
 	}
 
+	private String qualifiedName(String objectName) {
+		return schemaName + "." + objectName;
+	}
+
+	private static String validateSchemaName(String schemaName) {
+
+		if (schemaName == null || schemaName.isBlank()) {
+			throw new IllegalArgumentException("Oracle schema name must not be empty.");
+		}
+
+		String normalized = schemaName.trim().toUpperCase(Locale.ROOT);
+
+		if (!ORACLE_IDENTIFIER.matcher(normalized).matches() || normalized.length() > 128) {
+
+			throw new IllegalArgumentException("Invalid Oracle schema name: " + schemaName);
+		}
+
+		return normalized;
+	}
+
 	private void execute(Connection connection, String sql) throws SQLException {
+
 		try (Statement statement = connection.createStatement()) {
 			statement.execute(sql);
 		}
