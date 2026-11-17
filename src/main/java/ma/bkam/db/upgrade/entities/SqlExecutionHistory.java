@@ -22,8 +22,7 @@ import ma.bkam.db.upgrade.enums.ErrorCodeEnum;
 import ma.bkam.db.upgrade.enums.ExecutionStatusEnum;
 
 @Entity
-@Table(schema = "cotmad", name = "SQL_EXECUTION_HISTORY", indexes = {
-		@Index(name = "IDX_SQL_HIST_SEQ", columnList = "SEQUENCE_NUMBER"),
+@Table(name = "SQL_EXECUTION_HISTORY", indexes = { @Index(name = "IDX_SQL_HIST_SEQ", columnList = "SEQUENCE_NUMBER"),
 		@Index(name = "IDX_SQL_HIST_FILENAME", columnList = "FILENAME"),
 		@Index(name = "IDX_SQL_HIST_CHECKSUM", columnList = "CHECKSUM_SHA256") })
 @Getter
@@ -34,7 +33,7 @@ import ma.bkam.db.upgrade.enums.ExecutionStatusEnum;
 public class SqlExecutionHistory {
 
 	@Id
-	@SequenceGenerator(name = "sql_execution_history_seq_gen", sequenceName = "cotmad.sql_execution_history_seq", allocationSize = 1)
+	@SequenceGenerator(name = "sql_execution_history_seq_gen", sequenceName = "sql_execution_history_seq", allocationSize = 1)
 	@GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "sql_execution_history_seq_gen")
 	@Column(name = "ID", nullable = false)
 	private Long id;
